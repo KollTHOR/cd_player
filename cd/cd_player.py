@@ -628,6 +628,21 @@ class CDPlayer:
                 self.is_playing, self.is_mplayer_alive()
             )
             
+            if (
+                self.is_playing and
+                elapsed >= track_length and
+                track < self.total_tracks
+            ):
+                print(f"🔄 Track {track} ended, advancing to {track + 1}")
+                self.load_track(track + 1)
+            elif (
+                self.is_playing and
+                elapsed >= track_length and
+                track == self.total_tracks
+            ):
+                print("🔔 End of CD reached")
+                # Optionally: self.lcd.show_message("End of CD", "Playback finished")
+
         except Exception as e:
             print(f"❌ Display update error: {e}")
     
