@@ -23,6 +23,11 @@ class CDPlayer:
         self.total_tracks = 1
         self.is_playing = False
         self.track_lengths = {}
+
+
+        self.album_title = "Unknown Album"
+        self.artist = "Unknown Artist"
+        self.track_titles = {}  # {track_num: title}
         
         # Timing variables
         self.playback_start_time = None
@@ -198,6 +203,20 @@ class CDPlayer:
 
         # Detect tracks
         self.total_tracks, self.track_lengths = self.cd_detector.detect_cd_tracks()
+
+        # --- Fetch metadata ---
+        try:
+            from utils.cd_metadata import get_cd_metadata
+            album, artist, titles = get_cd_metadata()
+            self.album_title = album
+            self.artist = artist
+            self.track_titles = {i+1: t for i, t in enumerate(titles)}
+            print(f"✅ CD metadata: {album} / {artist}")
+        except Exception as e:
+            print(f"⚠️ Metadata lookup failed: {e}")
+            self.album_title = "Unknown Album"
+            self.artist = "Unknown Artist"
+            self.track_titles = {i+1: f"Track {i+1:02d}/{self.total_tracks:02d}" for i in range(self.total_tracks)}
 
         # Reset state completely
         self.current_track = 1
@@ -600,39 +619,42 @@ class CDPlayer:
 
     
     def update_display(self):
-        """Update LCD display callback with enhanced error handling"""
         if self.menu_system.in_menu:
             return
-        
+    
         try:
             track = self.get_current_track()
-            
-            # Check if MPlayer is still alive
             if not self.is_mplayer_alive():
                 self.lcd.show_message(f"Loading {track:02d}/{self.total_tracks:02d}", "Please wait...")
                 return
-            
+    
             if not self.check_mplayer_ready():
                 self.lcd.show_message(f"Loading {track:02d}/{self.total_tracks:02d}", "Please wait...")
                 return
-            
+    
             elapsed = self.get_elapsed_time()
             track_length = self.track_lengths.get(track, 180)
-            
             if elapsed > track_length:
                 elapsed = track_length
-            
-            self.lcd.update_track_display(
-                track, self.total_tracks,
-                elapsed, track_length,
-                self.is_playing, self.is_mplayer_alive()
+    
+            # Use track title if available
+            title = self.track_titles.get(track, f"Track {track:02d}/{self.total_tracks:02d}")
+            line1 = title[:16].ljust(16)
+    
+            self.lcd.update_track_display_custom(
+                line1,
+                elapsed,
+                track_length,
+                self.is_playing,
+                self.is_mplayer_alive()
             )
-            
+    
             if (
                 self.is_playing and
                 elapsed >= track_length and
                 track < self.total_tracks
             ):
+                time.sleep(5)
                 print(f"🔄 Track {track} ended, advancing to {track + 1}")
                 self.load_track(track + 1)
             elif (
@@ -641,8 +663,7 @@ class CDPlayer:
                 track == self.total_tracks
             ):
                 print("🔔 End of CD reached")
-                # Optionally: self.lcd.show_message("End of CD", "Playback finished")
-
+    
         except Exception as e:
             print(f"❌ Display update error: {e}")
     

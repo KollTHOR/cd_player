@@ -44,6 +44,10 @@ class LCDDisplay:
                 charmap='A02',
                 auto_linebreaks=True
             )
+            # Disable cursor and blinking
+            self.lcd.cursor = False
+            self.lcd.blink = False
+
             self.lcd.clear()
             self.show_message("CD Player Ready", "Insert CD...")
             print("✅ LCD initialized successfully")
@@ -69,12 +73,12 @@ class LCDDisplay:
     def update_track_display(self, track, total_tracks, elapsed, track_length, is_playing, is_alive):
         if not self.lcd:
             return
-    
+
         line1 = f"Track {track:02d}/{total_tracks:02d}".ljust(16)
         time_str = f"{format_time(elapsed)}/{format_time(track_length)}"
         indicator = ">" if is_alive and is_playing else "||" if is_alive else "X"
         line2 = time_str.ljust(15) + indicator
-    
+
         # Only update if content changed
         if line1 != self.last_line1 or line2 != self.last_line2:
             # Only clear if major change (optional)
@@ -85,7 +89,23 @@ class LCDDisplay:
             self.lcd.write_string(line2)
             self.last_line1 = line1
             self.last_line2 = line2
-    
+
+    def update_track_display_custom(self, line1, elapsed, track_length, is_playing, is_alive):
+        """Show custom title with time/progress and indicator."""
+        if not self.lcd:
+            return
+        try:
+            time_str = f"{format_time(elapsed)}/{format_time(track_length)}"
+            indicator = ">" if is_alive and is_playing else "||" if is_alive else "X"
+            line2 = time_str.ljust(15) + indicator
+            self.lcd.cursor_pos = (0, 0)
+            self.lcd.write_string(line1[:16])
+            self.lcd.cursor_pos = (1, 0)
+            self.lcd.write_string(line2[:16])
+        except Exception as e:
+            print(f"❌ LCD update error: {e}")
+
+
     def clear_cache(self):
         """Clear the LCD cache to force refresh"""
         self.last_line1 = ""
