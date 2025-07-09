@@ -35,7 +35,7 @@ class CDPlayer:
         # Components initialization
         self.lcd = LCDDisplay()
         self.audio_manager = AudioManager()
-        self.menu_system = MenuSystem(self.lcd, self.audio_manager)
+        self.menu_system = MenuSystem(self.lcd, self.audio_manager, self)
         self.gpio_handler = GPIOHandler(self)
         self.cd_detector = CDDetector(self)
 
@@ -159,22 +159,32 @@ class CDPlayer:
             self.menu_system.exit_menu()
     
     def on_previous_button(self):
-        """Handle previous button press"""
+        # Always check menu state first
+        if self.menu_system.in_action_menu:
+            return  # Ignore track change if in action menu
         if self.menu_system.in_submenu:
             self.menu_system.submenu_previous()
         elif self.menu_system.in_menu:
             self.menu_system.menu_previous()
         else:
-            self.previous_track()
+            if self.is_cd_loaded():
+                self.previous_track()
+            else:
+                print("⚠️ Cannot change track: No CD loaded")
     
     def on_next_button(self):
         """Handle next button press"""
+        if self.menu_system.in_action_menu:
+            return  # Ignore track change if in action menu
         if self.menu_system.in_submenu:
             self.menu_system.submenu_next()
         elif self.menu_system.in_menu:
             self.menu_system.menu_next()
         else:
-            self.next_track()
+            if self.is_cd_loaded():
+                self.next_track()
+            else:
+                print("⚠️ Cannot change track: No CD loaded")
 
     # Core playback methods
     def load_cd_paused(self):
@@ -200,15 +210,8 @@ class CDPlayer:
         # Force track 1 in state file
         safe_write_file(TRACK_FILE, "1")
 
-        # Load track 1 in paused state
-        success = self.load_track_paused(1)
-
-        if success:
-            if self.lcd:
-                self.lcd.show_message("CD Ready", "Press Play")
-        else:
-            if self.lcd:
-                self.lcd.show_message("CD Error", "Try Again")
+        self.menu_system.enter_menu()
+        self.menu_system.enter_submenu("Tracks")
     
     def _get_audio_output(self):
         """Determine correct audio output based on current device"""
@@ -472,21 +475,35 @@ class CDPlayer:
 
         else:
             print("❌ Play/pause command failed")
-    
+
+    def is_cd_loaded(self):
+        # You can set a flag when CD is loaded, or check if total_tracks is set
+        return self.total_tracks is not None and self.total_tracks > 0
+
+
     def previous_track(self):
-        """Go to previous track"""
+        if not self.is_cd_loaded() or self.total_tracks < 1:
+            print("⚠️ No CD loaded or invalid track count")
+            return
         if self.current_track > 1:
             new_track = self.current_track - 1
             if self.load_track(new_track):
                 print(f"⏮️ Previous track: {new_track}")
+        else:
+            print("🔔 Already at first track.")
     
     def next_track(self):
-        """Go to next track"""
+        # Only allow if CD is loaded and total_tracks is valid
+        if not self.is_cd_loaded() or self.total_tracks < 1:
+            print("⚠️ No CD loaded or invalid track count")
+            return
         if self.current_track < self.total_tracks:
             new_track = self.current_track + 1
             if self.load_track(new_track):
                 print(f"⏭️ Next track: {new_track}")
-    
+        else:
+            print("🔔 Already at last track.")
+
     def send_command(self, cmd):
         """Send command directly to MPlayer without readiness check"""
         if not self.is_mplayer_alive():
