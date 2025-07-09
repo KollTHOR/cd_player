@@ -67,50 +67,24 @@ class LCDDisplay:
             print(f"❌ LCD message error: {e}")
     
     def update_track_display(self, track, total_tracks, elapsed, track_length, is_playing, is_alive):
-        """Update LCD with enhanced error handling"""
         if not self.lcd:
             return
-        
-        try:
-            line1 = f"Track {track:02d}/{total_tracks:02d}"
-            time_str = f"{format_time(elapsed)}/{format_time(track_length)}"
-            line2 = time_str
-            
-            if is_alive:
-                indicator = ">" if is_playing else "||"
-            else:
-                indicator = "X"
-            
-            # Only update if content changed AND LCD is responsive
-            if (line1 != self.last_line1 or 
-                line2 != self.last_line2 or 
-                indicator != self.last_indicator):
-                
-                # Clear and reinitialize LCD if corruption detected
-                try:
-                    self.lcd.clear()
-                    time.sleep(0.1)  # Allow LCD to process clear command
-                    
-                    self.lcd.write_string(line1)
-                    self.lcd.cursor_pos = (1, 0)
-                    self.lcd.write_string(line2)
-                    
-                    if len(line2) < 14 and indicator:
-                        self.lcd.cursor_pos = (1, 14)
-                        self.lcd.write_string(indicator)
-                    
-                    self.last_line1 = line1
-                    self.last_line2 = line2
-                    self.last_indicator = indicator
-                    
-                except Exception as lcd_error:
-                    print(f"❌ LCD corruption detected, reinitializing: {lcd_error}")
-                    self.init_lcd()  # Reinitialize LCD on corruption
-                    
-        except Exception as e:
-            print(f"❌ LCD update error: {e}")
-            # Force LCD reinitialization on any error
-            self.init_lcd()
+    
+        line1 = f"Track {track:02d}/{total_tracks:02d}".ljust(16)
+        time_str = f"{format_time(elapsed)}/{format_time(track_length)}"
+        indicator = ">" if is_alive and is_playing else "||" if is_alive else "X"
+        line2 = time_str.ljust(15) + indicator
+    
+        # Only update if content changed
+        if line1 != self.last_line1 or line2 != self.last_line2:
+            # Only clear if major change (optional)
+            # self.lcd.clear()
+            self.lcd.cursor_pos = (0, 0)
+            self.lcd.write_string(line1)
+            self.lcd.cursor_pos = (1, 0)
+            self.lcd.write_string(line2)
+            self.last_line1 = line1
+            self.last_line2 = line2
     
     def clear_cache(self):
         """Clear the LCD cache to force refresh"""
