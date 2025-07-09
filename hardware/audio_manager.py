@@ -17,6 +17,7 @@ class AudioManager:
         self.cd_player_callback: Optional[Callable[[], None]] = None
         
         self.scan_devices()
+        self.restore_last_device()
     
     def set_audio_change_callback(self, callback: Callable[[], None]) -> None:
         """Register callback for audio device changes"""
@@ -26,6 +27,19 @@ class AudioManager:
         else:
             print("❌ Invalid callback provided")
             self.cd_player_callback = None
+
+    def restore_last_device(self):
+        try:
+            with open("/tmp/last_audio_device.txt", "r") as f:
+                last_device_id = f.read().strip()
+            # Check if device is still available
+            for device in self.available_devices:
+                if device['id'] == last_device_id:
+                    print(f"🔄 Restoring last audio device: {last_device_id}")
+                    self.set_device(last_device_id)
+                    break
+        except Exception:
+            print("ℹ️ No last audio device to restore")
     
     def _run_as_user(self, command, timeout=10):
         """Run command as orangepi user for PulseAudio access"""
@@ -175,6 +189,12 @@ class AudioManager:
         """Set the current audio device and notify CD player"""
         old_device = self.current_device
         self.current_device = device_id
+
+        try:
+            with open("/tmp/last_audio_device.txt", "w") as f:
+                f.write(device_id)
+        except Exception as e:
+            print(f"❌ Failed to save last audio device: {e}")
 
         # Handle PulseAudio sink switching
         if device_id.startswith('pulse:'):
